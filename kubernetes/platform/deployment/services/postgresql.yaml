@@ -1,7 +1,7 @@
 # PostgreSQLデータベースのDeployment設定
 apiVersion: apps/v1 # どのバージョンのKubernetes APIを使用するかを指定
 kind: Deployment # どの種類のKubernetesリソースを作成するかを指定
-metadata: # オブジェクトのメタデータ
+metadata: # オブジェクトのメタデータ。オブジェクトを識別するための情報を含む
   name: polar-postgres
   labels:
     db: polar-postgres  # デプロイメントを識別するためのラベル
