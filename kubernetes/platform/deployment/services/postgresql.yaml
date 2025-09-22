@@ -1,0 +1,51 @@
+# PostgreSQLデータベースのDeployment設定
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polar-postgres
+  labels:
+    db: polar-postgres  # デプロイメントを識別するためのラベル
+spec:
+  selector:
+    matchLabels:
+      db: polar-postgres  # 管理対象のPodを選択するためのラベルセレクター
+  template:
+    metadata:
+      labels:
+        db: polar-postgres  # 作成されるPodに付与されるラベル
+    spec:
+      containers:
+        - name: polar-postgres
+          image: postgres:17.6  # PostgreSQL 17.6の公式Dockerイメージを使用
+          env:
+            # PostgreSQLの初期設定用環境変数
+            - name: POSTGRES_USER
+              value: user  # データベースの管理者ユーザー名
+            - name: POSTGRES_PASSWORD
+              value: password  # データベースの管理者パスワード（本番環境では秘匿化推奨）
+            - name: POSTGRES_DB
+              value: polardb_catalog  # 初期作成されるデータベース名
+          resources:
+            requests:
+              cpu: 100m      # 最低限必要なCPUリソース（0.1コア）
+              memory: 60Mi   # 最低限必要なメモリ（60MB）
+            limits:
+              cpu: 200m      # 最大使用可能なCPUリソース（0.2コア）
+              memory: 120Mi  # 最大使用可能なメモリ（120MB）
+
+---
+# PostgreSQLサービス設定 - クラスター内アクセス用
+apiVersion: v1
+kind: Service
+metadata:
+  name: polar-postgres  # サービス名（他のアプリケーションが接続時に使用）
+  labels:
+    db: polar-postgres  # サービスを識別するためのラベル
+spec:
+  type: ClusterIP  # クラスター内部のみからアクセス可能（外部公開なし）
+  selector:
+    db: polar-postgres  # どのPodにトラフィックを転送するかの選択条件
+  ports:
+    - protocol: TCP  # TCP通信プロトコルを使用
+      port: 5432  # サービスが公開するポート番号（PostgreSQLの標準ポート）
+      targetPort: 5432  # コンテナ内のPostgreSQLが待ち受けているポート番号
