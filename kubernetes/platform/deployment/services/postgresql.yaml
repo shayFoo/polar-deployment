@@ -5,7 +5,7 @@ metadata: # オブジェクトのメタデータ。オブジェクトを識別�
   name: polar-postgres
   labels:
     db: polar-postgres  # デプロイメントを識別するためのラベル
-spec:
+spec: # オブジェクトの「理想の状態」を定義するセクション
   selector:
     matchLabels:
       db: polar-postgres  # 管理対象のPodを選択するためのラベルセレクター
