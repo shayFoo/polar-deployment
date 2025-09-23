@@ -1,3 +1,13 @@
+# PostgreSQL初期化スクリプト用ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+data:
+  init.sql: |
+    -- polardb_catalogは既にPOSTGRES_DBで作成されているため、orderデータベースのみ作成
+    CREATE DATABASE polardb_order;
+---
 # PostgreSQLデータベースのDeployment設定
 apiVersion: apps/v1 # どのバージョンのKubernetes APIを使用するかを指定
 kind: Deployment # どの種類のKubernetesリソースを作成するかを指定
@@ -32,8 +42,15 @@ spec: # オブジェクトの「理想の状態」を定義するセクション
             limits:
               cpu: 200m      # 最大使用可能なCPUリソース（0.2コア）
               memory: 120Mi  # 最大使用可能なメモリ（120MB）
-
----
+          volumeMounts:
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: init-sql
+          configMap:
+            name: postgres-init-script
+--- 
 # PostgreSQLサービス設定 - クラスター内アクセス用
 apiVersion: v1
 kind: Service

@@ -3,7 +3,7 @@ services:
     depends_on:
       - polar-postgres
       - config-service
-    image: "catalog-service"
+    image: "catalog-service:0.0.1-SNAPSHOT"
     container_name: "catalog-service"
     ports:
       - 9001:9001
@@ -18,10 +18,10 @@ services:
       - SPRING_CLOUD_CONFIG_FAIL-FAST=true
       - SPRING_CLOUD_CONFIG_RETRY_MAX-ATTEMPTS=10
   config-service:
-      image: "config-service"
-      container_name: "config-service"
-      ports:
-        - 8888:8888
+    image: "config-service:0.0.1-SNAPSHOT"
+    container_name: "config-service"
+    ports:
+      - 8888:8888
   polar-postgres:
     image: "postgres:17.6"
     container_name: "polar-postgres"
@@ -31,3 +31,5 @@ services:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=postgres
+    volumes:
+      - ./postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql
