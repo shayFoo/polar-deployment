@@ -3,13 +3,15 @@ services:
     depends_on:
       - polar-postgres
       - config-service
+      - polar-keycloak
     image: "catalog-service:0.0.1-SNAPSHOT"
     container_name: "catalog-service"
     ports:
       - 9001:9001
       - 8001:8001
+    restart: unless-stopped
     environment:
-      - BPL_JVM_THREAdD_COUNT=50
+      - BPL_JVM_THREAD_COUNT=50
       - BPL_DEBUG_ENABLED=true
       - BPL_DEBUG_PORT=8001
       - SPRING_DATASOURCE_URL=jdbc:postgresql://polar-postgres:5432/postgres
@@ -17,19 +19,111 @@ services:
       - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
       - SPRING_CLOUD_CONFIG_FAIL-FAST=true
       - SPRING_CLOUD_CONFIG_RETRY_MAX-ATTEMPTS=10
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER-URI=http://polar-keycloak:8080/realms/PolarBookshop
   config-service:
     image: "config-service:0.0.1-SNAPSHOT"
     container_name: "config-service"
     ports:
       - 8888:8888
+    restart: unless-stopped
+  order-service:
+    depends_on:
+      - polar-postgres
+      - config-service
+      - catalog-service
+      - polar-rabbitmq
+      - polar-keycloak
+    image: "order-service:0.0.1-SNAPSHOT"
+    container_name: "order-service"
+    ports:
+      - 9002:9002
+      - 8002:8002
+    restart: unless-stopped
+    environment:
+      - BPL_JVM_THREAdD_COUNT=50
+      - BPL_DEBUG_ENABLED=true
+      - BPL_DEBUG_PORT=8002
+      - SPRING_FLYWAY_URL=jdbc:postgresql://polar-postgres:5432/polardb_order
+      - SPRING_R2DBC_URL=r2dbc:postgresql://polar-postgres:5432/polardb_order
+      - SPRING_PROFILES_ACTIVE=testdata
+      - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
+      - SPRING_CLOUD_CONFIG_FAIL-FAST=true
+      - SPRING_CLOUD_CONFIG_RETRY_MAX-ATTEMPTS=20
+      - SPRING_CLOUD_CONFIG_RETRY_MULTIPLIER=1.5
+      - SPRING_RABBITMQ_HOST=polar-rabbitmq
+      - POLAR_CATALOG-SERVICE-URI=http://catalog-service:9001
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER-URI=http://polar-keycloak:8080/realms/PolarBookshop
+  edge-service:
+    depends_on:
+      - config-service
+      - catalog-service
+      - order-service
+      - polar-redis
+      - polar-keycloak
+    image: "edge-service:0.0.1-SNAPSHOT"
+    container_name: "edge-service"
+    ports:
+      - 9000:9000
+      - 8000:8000
+    restart: unless-stopped
+    environment:
+      - BPL_JVM_THREAD_COUNT=50
+      - BPL_DEBUG_ENABLED=true
+      - BPL_DEBUG_PORT=8000
+      - SPRING_PROFILES_ACTIVE=testdata
+      - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
+      - SPRING_CLOUD_CONFIG_FAIL-FAST=true
+      - SPRING_CLOUD_CONFIG_RETRY_MAX-ATTEMPTS=10
+      - CATALOG_SERVICE_URL=http://catalog-service:9001
+      - ORDER_SERVICE_URL=http://order-service:9002
+      - SPRING_DATA_REDIS_HOST=polar-redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPA_URL=http://polar-ui:9004
+      - SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_ISSUER-URI=http://polar-keycloak:8080/realms/PolarBookshop
   polar-postgres:
     image: "postgres:17.6"
     container_name: "polar-postgres"
     ports:
       - 5432:5432
+    restart: unless-stopped
     environment:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=postgres
     volumes:
       - ./postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql
+  polar-redis:
+    image: "redis:8.2.1"
+    container_name: "polar-redis"
+    ports:
+      - 6379:6379
+    restart: unless-stopped
+  polar-rabbitmq:
+    image: rabbitmq:4.1.4-management
+    container_name: "polar-rabbitmq"
+    ports:
+      - 5672:5672
+      - 15672:15672
+    restart: unless-stopped
+    volumes:
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+  polar-keycloak:
+    image: keycloak/keycloak:26.4
+    container_name: "polar-keycloak"
+    command: ["start-dev", "--import-realm"]
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=password
+      - KC_BOOTSTRAP_ADMIN=admin
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=password
+    ports:
+      - 8080:8080
+  polar-ui:
+    image: "ghcr.io/polarbookshop/polar-ui:v1"
+    container_name: "polar-ui"
+    ports:
+      - 9004:9004
+    environment:
+      - PORT=9004
