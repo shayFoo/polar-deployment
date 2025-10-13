@@ -4,6 +4,8 @@ services:
       - polar-postgres
       - config-service
       - polar-keycloak
+      - tempo
+      - fluent-bit
     image: "catalog-service:0.0.1-SNAPSHOT"
     container_name: "catalog-service"
     ports:
@@ -20,12 +22,32 @@ services:
       - SPRING_CLOUD_CONFIG_FAIL-FAST=true
       - SPRING_CLOUD_CONFIG_RETRY_MAX-ATTEMPTS=10
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER-URI=http://polar-keycloak:8080/realms/PolarBookshop
+      - MANAGEMENT_OTLP_TRACING_ENDPOINT=http://tempo:4318/v1/traces
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+        fluentd-async: "true"
+        fluentd-retry-wait: "1s"
+        fluentd-max-retries: "5"
   config-service:
+    depends_on:
+      - fluent-bit
+      - tempo
     image: "config-service:0.0.1-SNAPSHOT"
     container_name: "config-service"
     ports:
       - 8888:8888
     restart: unless-stopped
+    environment:
+      - MANAGEMENT_OTLP_TRACING_ENDPOINT=http://tempo:4318/v1/traces
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+        fluentd-async: "true"
+        fluentd-retry-wait: "1s"
+        fluentd-max-retries: "5"
   order-service:
     depends_on:
       - polar-postgres
@@ -33,6 +55,7 @@ services:
       - catalog-service
       - polar-rabbitmq
       - polar-keycloak
+      - fluent-bit
     image: "order-service:0.0.1-SNAPSHOT"
     container_name: "order-service"
     ports:
@@ -40,7 +63,7 @@ services:
       - 8002:8002
     restart: unless-stopped
     environment:
-      - BPL_JVM_THREAdD_COUNT=50
+      - BPL_JVM_THREAD_COUNT=50
       - BPL_DEBUG_ENABLED=true
       - BPL_DEBUG_PORT=8002
       - SPRING_FLYWAY_URL=jdbc:postgresql://polar-postgres:5432/polardb_order
@@ -53,6 +76,13 @@ services:
       - SPRING_RABBITMQ_HOST=polar-rabbitmq
       - POLAR_CATALOG-SERVICE-URI=http://catalog-service:9001
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER-URI=http://polar-keycloak:8080/realms/PolarBookshop
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+        fluentd-async: "true"
+        fluentd-retry-wait: "1s"
+        fluentd-max-retries: "5"
   edge-service:
     depends_on:
       - config-service
@@ -60,6 +90,8 @@ services:
       - order-service
       - polar-redis
       - polar-keycloak
+      - tempo
+      - fluent-bit
     image: "edge-service:0.0.1-SNAPSHOT"
     container_name: "edge-service"
     ports:
@@ -80,6 +112,36 @@ services:
       - SPRING_DATA_REDIS_PORT=6379
       - SPA_URL=http://polar-ui:9004
       - SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_ISSUER-URI=http://polar-keycloak:8080/realms/PolarBookshop
+      - MANAGEMENT_OTLP_TRACING_ENDPOINT=http://tempo:4318/v1/traces
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+        fluentd-async: "true"
+        fluentd-retry-wait: "1s"
+        fluentd-max-retries: "5"
+  dispatcher-service:
+    depends_on:
+      - fluent-bit
+      - polar-rabbitmq
+      - config-service
+      - tempo
+    image: "dispatcher-service:0.0.1-SNAPSHOT"
+    container_name: dispatcher-service
+    ports:
+      - 9003:9003
+      - 8003:8003
+    environment:
+      # Buildpacks environment variable to enable debug through a socket on port 8002
+      - BPL_DEBUG_ENABLED=true
+      - BPL_DEBUG_PORT=8003
+      - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
+      - SPRING_RABBITMQ_HOST=polar-rabbitmq
+      - MANAGEMENT_OTLP_TRACING_ENDPOINT=http://tempo:4318/v1/traces
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
   polar-postgres:
     image: "postgres:17.6"
     container_name: "polar-postgres"
@@ -127,3 +189,54 @@ services:
       - 9004:9004
     environment:
       - PORT=9004
+  grafana:
+    image: grafana/grafana:12.3.0-18392635519
+    container_name: "grafana"
+    depends_on:
+      - loki
+      - prometheus
+      - tempo
+    ports:
+      - 3000:3000
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=password
+    volumes:
+      - ./observability/grafana/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yaml
+      - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./observability/grafana/grafana.ini:/etc/grafana/grafana.ini
+  loki:
+    image: grafana/loki:3.5
+    container_name: "loki"
+    depends_on:
+      - fluent-bit
+    ports:
+      - 3100:3100
+  fluent-bit:
+    image: fluent/fluent-bit:4.1.1-amd64
+    container_name: "fluent-bit"
+    ports:
+      - 24224:24224
+    environment:
+      - LOKI_HOST=loki
+      - LOKI_PORT=3100
+      - LOKI_PATH=/loki/api/v1/push
+    volumes:
+      - ./observability/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+  prometheus:
+    image: prom/prometheus:v3.6.0
+    container_name: "prometheus"
+    ports:
+      - 9090:9090
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+  tempo:
+    image: grafana/tempo:latest
+    container_name: "tempo"
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    ports:
+      - 4318:4318 # OTLP HTTP
+      - 4317:4317 # OTLP gRPC
+      - 3200:3200 # Tempo HTTP (Lokiと競合回避のため3200に変更)
+    volumes:
+      - ./observability/tempo/tempo.yml:/etc/tempo/tempo.yml
