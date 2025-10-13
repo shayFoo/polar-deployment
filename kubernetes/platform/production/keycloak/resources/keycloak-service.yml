@@ -1,0 +1,13 @@
+# keycloak-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-service
+spec:
+  type: LoadBalancer # DigitalOcean Load Balancerを作成
+  selector:
+    app: keycloak # このラベルを持つPodにトラフィックを転送
+  ports:
+    - protocol: TCP
+      port: 8080       # Serviceが公開するポート
+      targetPort: 8080 # コンテナのポート

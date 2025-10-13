@@ -1,0 +1,85 @@
+# keycloak-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels:
+    app: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+      - name: keycloak
+        # 最新のKeycloakイメージを指定
+        image: quay.io/keycloak/keycloak:26.4
+        args: ["start-dev"]
+        env:
+          # Keycloak管理者ユーザーとパスワード
+          - name: KEYCLOAK_ADMIN
+            value: "admin"
+          - name: KEYCLOAK_ADMIN_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: keycloak-db-secret
+                key: KEYCLOAK_ADMIN_PASSWORD
+          # データベースの種類
+          - name: KC_DB
+            value: "postgres"
+          # データベース接続情報 (Secretから読み込み)
+          - name: KC_DB_URL_HOST
+            valueFrom:
+              secretKeyRef:
+                name: keycloak-db-secret # ステップ2で作成したSecret名
+                key: KEYCLOAK_DB_ADDR
+          - name: KC_DB_DATABASE
+            valueFrom:
+              secretKeyRef:
+                name: keycloak-db-secret
+                key: KEYCLOAK_DB_DATABASE
+          - name: KC_DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: keycloak-db-secret
+                key: KEYCLOAK_DB_USER
+          - name: KC_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: keycloak-db-secret
+                key: KEYCLOAK_DB_PASSWORD
+          - name: KEYCLOAK_EXTRA_ARGS
+            value: "--import-realm"
+          # プロキシ経由でアクセスする場合の設定
+          - name: KC_PROXY
+            value: "edge"
+          - name: KC_HTTP_ENABLED
+            value: "true"
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 60
+          timeoutSeconds: 1
+        volumeMounts:
+            - name: polar-keycloak-config-volume
+              mountPath: /opt/keycloak/data/import
+        resources:
+          requests:
+            cpu: "0.2"
+            memory: "756Mi"
+          limits:
+            cpu: "2"
+            memory: "756Mi"
+      volumes:
+        - name: polar-keycloak-config-volume
+          configMap:
+            name: keycloak-config
