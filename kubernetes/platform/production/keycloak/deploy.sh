@@ -7,17 +7,14 @@ echo "\n🗝️  Keycloak deployment started.\n"
 echo "📦 Installing Keycloak..."
 
 clientSecret=$(echo $RANDOM | openssl md5 | head -c 20)
-
-kubectl apply -f resources/namespace.yml
 sed "s/polar-keycloak-secret/$clientSecret/" resources/keycloak-config.yml | kubectl apply -f -
 
 echo "\n📦 deploy keycloak."
 
 kubectl apply -f resources/keycloak-deployment.yml
 kubectl apply -f resources/keycloak-service.yml
-kubectl apply -f resources/keycloak-ingress.yml
 
-sleep 15
+echo "\n⌛ Waiting for Keycloak to be deployed."
 
 while [ $(kubectl get pod -l app=keycloak  | wc -l) -eq 0 ] ; do
   sleep 15
@@ -27,8 +24,7 @@ echo "\n⌛ Waiting for Keycloak to be ready..."
 
 kubectl wait \
   --for=condition=ready pod \
-  --selector=app=polar-keycloak \
-  --namespace=keycloak-system \
+  --selector=app=keycloak \
   --timeout=600s \
 
 echo "\n✅  Keycloak cluster has been successfully deployed."
