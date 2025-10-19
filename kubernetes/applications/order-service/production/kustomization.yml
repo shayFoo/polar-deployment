@@ -16,5 +16,5 @@ images:
   newName: ghcr.io/shayfoo/order-service
   newTag: 9ffcab55a687a1c38bfb9c5e56e90687105a35f3
 replicas:
-- count: 2
+- count: 1
   name: order-service
