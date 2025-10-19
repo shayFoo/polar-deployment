@@ -1,1 +1,2 @@
-- [allow-snippet](https://stackoverflow.com/questions/77274854/ingress-controller-does-not-allow-snippets)
+- [allow-snippetで詰まったら](https://stackoverflow.com/questions/77274854/ingress-controller-does-not-allow-snippets)
+- 
