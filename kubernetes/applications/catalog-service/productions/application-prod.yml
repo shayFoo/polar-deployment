@@ -1,0 +1,5 @@
+polar: 
+  greeting: "Hello from Production Catalog Service!"
+spring:
+  config:
+    import: configtree:/workspace/secrets/*/

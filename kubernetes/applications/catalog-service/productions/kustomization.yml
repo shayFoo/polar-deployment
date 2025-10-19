@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- github.com/shayFoo/catalog-service/k8s?ref=main
+patches:
+- path: patch-env.yml
+- path: patch-volumes.yml
+- path: patch-resources.yml
+configMapGenerator:
+- behavior: merge
+  files:
+  - application-prod.yml
+  name: catalog-config
+images:
+- name: catalog-service
+  newName: ghcr.io/shayfoo/catalog-service
+  newTag: 0a7577ba005ddab83f50e4f6f6760e4f4f51e298
+replicas:
+  - count: 2
+    name: catalog-service
