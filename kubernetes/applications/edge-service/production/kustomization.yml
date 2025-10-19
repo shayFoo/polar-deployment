@@ -15,7 +15,7 @@ patches:
 images:
 - name: edge-service
   newName: ghcr.io/shayfoo/edge-service
-  newTag: 55d45ff8ae04daea69db5cf683e7d2070caa87fc
+  newTag: 4dacf34b9716f46787c85d1864da0da961be0e2e
 replicas:
 - count: 2
   name: edge-service
