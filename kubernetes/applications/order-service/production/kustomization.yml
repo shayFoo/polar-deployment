@@ -8,13 +8,13 @@ configMapGenerator:
   - application-prod.yml
   name: order-config
 patches:
-  - path: patch-env.yml
-  - path: patch-resources.yml
-  - path: patch-volumes.yml
+- path: patch-env.yml
+- path: patch-resources.yml
+- path: patch-volumes.yml
 images:
 - name: order-service
   newName: ghcr.io/shayfoo/order-service
-  newTag: latest
+  newTag: 9ffcab55a687a1c38bfb9c5e56e90687105a35f3
 replicas:
 - count: 2
   name: order-service
