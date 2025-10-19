@@ -1,0 +1,1 @@
+- [allow-snippet](https://stackoverflow.com/questions/77274854/ingress-controller-does-not-allow-snippets)
